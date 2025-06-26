@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "data": "2025-06-26T19:08:47.729508",
+    "resultado": "derrota",
+    "adversario": "Team Osore",
+    "mapa": "Summoner's Rift",
+    "usuario_id": "933794913982742558"
+  },
+  {
+    "id": 2,
+    "data": "2025-06-26T19:15:16.746144",
+    "resultado": "vit\u00f3ria",
+    "adversario": "FALXAC",
+    "mapa": "Summoner's Rift 5x5",
+    "usuario_id": "933794913982742558"
+  }
+]
