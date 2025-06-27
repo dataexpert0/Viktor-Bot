@@ -106,7 +106,6 @@ class DataWrapper(commands.Cog):
 
         plt.pie([vitorias, derrotas], labels = ["Vitórias", "Derrotas"], autopct = "%1.1f%%", colors = ["#66bb6a", "#ef5350"])
         plt.title("Taxa de Vitória nas Scrims")
-        plt.show()
 
         imagem_path = "resultados_scrims.png"
         plt.savefig(imagem_path)
