@@ -13,8 +13,11 @@ O **Viktor Bot** é um robô para Discord em linguagem Python (usando a discord.
 Nessa aba, ficará algumas propostas de implementação.
 
 • coleta de dados dos jogos automatizada através de API(s) 
+
 • análise individual da performance de um time baseado em winrates, trends, composições, etc;
+
 • insights com ferramentas de ML;
+
 • visualização de dados através de charts ex.: *plots em Seaborn/ggplot2*
 
 ## Código
@@ -26,5 +29,9 @@ O *Viktor Bot* é primariamente escrito em Python 3.x, mas existe a possibilidad
 O bot já possui alguns comandos básicos, como o registro de *scrims* através de Discord.UI, que é transferido para um arquivo .JSON criado na raíz. 
 
 *!scrim [line da equipe] [adversário] [mapa ou modalidade escolhida, ao dispor do usuário]*
+
 *!listarscrims* - retorna o resultado de todas as scrims registradas até o momento
+
 *!resultstats* - retorna um gráfico de pizza em ggplot2 contendo as vitórias e derrotas da equipe/taxas de vitória e derrota
+
+*/registrar* - slash command em testes que abre um formulário para preenchimento de dados *composição vs. composição*, para adição de feature futura capaz de fazer análise de *winrate* por campeão escolhido, *rota mais escolhida*, entre outros, com o auxílio de charts com Seaborn/ggplot2 e APIs.
