@@ -10,39 +10,51 @@ import seaborn as sns
 import json
 import matplotlib.pyplot as plt
 from datetime import datetime
+import traceback
 
 class ScrimModal(Modal, title = "Registrar Partida | Scrim"):
-    comp_time_principal = TextInput(label = "Registre aqui a composição da sua line", required = True)
-    comp_adversario = TextInput(label = "Insira aqui a composição adversária", required = True)
-    adversario = TextInput(label = "Insira aqui o nome do time ou line adversária", required = True)
-    line = TextInput(label = "Insira aqui a line específica que jogou a scrim", required = True)
-    resultado = TextInput(label="Vitória ou Derrota", required=True)
-    observacoes = TextInput(label="Observações", required=False)
+    def __init__(self):
+        super().__init__(title="Registrar Partida | Scrim")
 
+        self.comp_time_principal = TextInput(label="Composição da sua line", required=True)
+        self.comp_adversario = TextInput(label="Composição adversária", required=True)
+        self.adversario = TextInput(label="Nome do time adversário", required=True)
+        self.line = TextInput(label="Line que jogou", required=True)
+        self.resultado = TextInput(label="Vitória ou Derrota", required=True)
+
+        self.add_item(self.comp_time_principal)
+        self.add_item(self.comp_adversario)
+        self.add_item(self.adversario)
+        self.add_item(self.line)
+        self.add_item(self.resultado)
+        
     async def on_submit(self, interaction: discord.Interaction):
         dados = {
-            "timestamp": str(datetime.now()),
+            "id": gerar_novo_id(dataload()),
+            "data": str(datetime.now()),
+            "resultado": self.resultado.value.lower(),
+            "adversario": self.adversario.value,
+            "mapa": "Summoner's Rift",
+            "line": self.line.value,
+            "usuario_id": str(interaction.user.id),
             "comp_tp": self.comp_time_principal.value,
             "comp_adv": self.comp_adversario.value,
-            "adv": self.adversario.value,
-            "line": self.line.value,
-            "resultado": self.resultado.value,
-            "obs": self.observacoes.value
         }
 
         if not os.path.exists("scrims.json"):
             with open("scrims.json", "w") as f:
                 json.dump([], f)
 
-                with open("scrims.json", "r") as f:
-                    historico = json.load(f)
+        with open("scrims.json", "r") as f:
+            historico = json.load(f)
 
-                    historico.append(dados)
+        historico.append(dados)
 
-                    with open("scrims.json", "w") as f:
-                        json.dump(historico, f, indent = 2)
+        with open("scrims.json", "w") as f:
+            json.dump(historico, f, indent=2)
 
-                        await interaction.response.send_message("Scrim registrada com sucesso!", ephemeral=True)
+        await interaction.response.send_message("Scrim registrada com sucesso!", ephemeral=True)
+
 
 data = "scrims.json"
 
@@ -84,7 +96,9 @@ class ScrimButtons(View):
             "adversario": self.adversario,
             "mapa": self.mapa,
             "line": self.line,
-            "usuario_id": str(interaction.user.id)
+            "usuario_id": str(interaction.user.id),
+            "comp_tp": "",
+            "comp_adv": "",
         }
         dados.append(nova_scrim)
         datasave(dados)
@@ -113,7 +127,7 @@ class DataWrapper(commands.Cog):
             return
 
         texto = ""
-        for s in dados[-10:]:  # últimos 10
+        for s in dados[-10:]:
             resultado = "✅" if s["resultado"] == "vitória" else "❌"
             texto += f"{resultado} {s['adversario']} {s['line']} ({s['mapa']}) por <@{s['usuario_id']}> em {s['data'][:10]}\n"
 
@@ -148,7 +162,11 @@ class DataWrapper(commands.Cog):
 
     @app_commands.command(name = "registrar", description = "Registrar scrim através de formulário")
     async def registrar(self, interaction: discord.Interaction):
-        await interaction.response.send_modal(ScrimModal())
+        try:
+            await interaction.response.send_modal(ScrimModal())
+        except Exception as e:
+            print(f"Debug: {e}")
+            traceback.print_exc()
 
 
 async def setup(bot):
