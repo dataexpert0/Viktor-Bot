@@ -2,7 +2,8 @@ import os
 import asyncio
 import discord
 from discord.ext import commands
-from discord.ui import View, Button
+from discord.ui import View, Button, Modal, TextInput
+from discord import app_commands
 from dotenv import load_dotenv
 import pandas as pd 
 import seaborn as sns 
@@ -10,6 +11,38 @@ import json
 import matplotlib.pyplot as plt
 from datetime import datetime
 
+class ScrimModal(Modal, title = "Registrar Partida | Scrim"):
+    comp_time_principal = TextInput(label = "Registre aqui a composição da sua line", required = True)
+    comp_adversario = TextInput(label = "Insira aqui a composição adversária", required = True)
+    adversario = TextInput(label = "Insira aqui o nome do time ou line adversária", required = True)
+    line = TextInput(label = "Insira aqui a line específica que jogou a scrim", required = True)
+    resultado = TextInput(label="Vitória ou Derrota", required=True)
+    observacoes = TextInput(label="Observações", required=False)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        dados = {
+            "timestamp": str(datetime.now()),
+            "comp_tp": self.comp_time_principal.value,
+            "comp_adv": self.comp_adversario.value,
+            "adv": self.adversario.value,
+            "line": self.line.value,
+            "resultado": self.resultado.value,
+            "obs": self.observacoes.value
+        }
+
+        if not os.path.exists("scrims.json"):
+            with open("scrims.json", "w") as f:
+                json.dump([], f)
+
+                with open("scrims.json", "r") as f:
+                    historico = json.load(f)
+
+                    historico.append(dados)
+
+                    with open("scrims.json", "w") as f:
+                        json.dump(historico, f, indent = 2)
+
+                        await interaction.response.send_message("Scrim registrada com sucesso!", ephemeral=True)
 
 data = "scrims.json"
 
@@ -112,6 +145,10 @@ class DataWrapper(commands.Cog):
         plt.close()
 
         await ctx.send(file=discord.File(imagem_path))
+
+    @app_commands.command(name = "registrar", description = "Registrar scrim através de formulário")
+    async def registrar(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(ScrimModal())
 
 
 async def setup(bot):
