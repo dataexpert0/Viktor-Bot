@@ -65,5 +65,21 @@ class Utils(commands.Cog):
 
         await interaction.followup.send(embeds=embeds_to_send)
 
+    @app_commands.command(name="help", description="Consulta as informações básicas do bot.")
+    async def help(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
+        embedhelp = discord.Embed(
+            title = f"Bem-vindo a gloriosa evolução!",
+            description = f"O Viktor Bot é um auxiliar para várias necessidades em utilidades básicas, tratamento de dados, entre outros.",
+            color = discord.Color.blue()
+        )
+        embedhelp.add_field(name = "Autoria", value = "Atualmente sendo desenvolvido por dataexpert0.", inline=True)
+        embedhelp.add_field(name = "Linguagem utilizada", value = "Python", inline = True)
+        embedhelp.add_field(name = "Tecnologias", value = "Plotagem de gráficos, transformação de dados casuais, entre outros", inline=True)
+        embedhelp.set_footer(text = "Documentação: https://github.com/dataexpert0/Viktor-Bot")
+        
+        await interaction.followup.send(embed = embedhelp)
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(Utils(bot))
