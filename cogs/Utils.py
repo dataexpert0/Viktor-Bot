@@ -7,7 +7,11 @@ import json
 import tempfile
 import openmeteo_requests
 import requests_cache
+from bs4 import BeautifulSoup
 from retry_requests import retry
+from datetime import datetime, timezone
+
+samp_server_url = "https://open.mp/servers/80.75.221.41:7777"
 
 def envio_telegraph(image_path, mime_type='image/jpeg'):
     try:
@@ -385,6 +389,37 @@ class Utils(commands.Cog):
             import traceback
             print(f"[HOSPEDAR] Traceback completo:\n{traceback.format_exc()}")
             await ctx.send("Ocorreu um erro inesperado. Verifique os logs do terminal.")
+
+    @commands.command(name = "sampinfo")
+    async def sampinfo(self, ctx):
+        try:
+            response = requests.get("https://api.open.mp/servers/80.75.221.41:7777")
+
+            if response.status_code != 200:
+                print("A requisição falhou!")
+                return
+
+            data = response.json()
+
+            server = data['core']
+
+            hostname = server.get('hn', 'Servidor sem nome')
+            players = server.get('pc', "Desconhecido | Sem jogadores")
+            lastupdate = data['lastUpdated']
+            lastupdate_dt = datetime.strptime(lastupdate, "%Y-%m-%dT%H:%M:%S.%fZ")
+            lastupdate_dt = lastupdate_dt.replace(tzinfo=timezone.utc)
+
+            embed = discord.Embed(
+                title = hostname,
+                description = f"Jogadores: {players}\nÚltima atualização em formato UTC: {lastupdate_dt}",
+                color = 0x00ff00
+            )
+            embed.set_footer(text="Dados retirados via | Open.mp")
+            await ctx.send(embed = embed)
+
+        except Exception as e:
+            await ctx.send("Houve um erro ao realizar o famoso web-scraping no site Open-MP. Tente novamente mais tarde.")
+            print(e)
 
 
 async def setup(bot: commands.Bot):
