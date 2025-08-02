@@ -1,9 +1,170 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+import requests
+import os
+import json
+import tempfile
 import openmeteo_requests
 import requests_cache
 from retry_requests import retry
+
+def envio_telegraph(image_path, mime_type='image/jpeg'):
+    try:
+        print(f"[TELEGRAPH] Iniciando upload do arquivo: {image_path}")
+        print(f"[TELEGRAPH] MIME type: {mime_type}")
+        
+        # Verificar se o arquivo existe
+        if not os.path.exists(image_path):
+            print(f"[TELEGRAPH] Erro: Arquivo não encontrado: {image_path}")
+            return None
+            
+        # Verificar o tamanho do arquivo
+        file_size = os.path.getsize(image_path)
+        print(f"[TELEGRAPH] Tamanho do arquivo: {file_size} bytes")
+        
+        # Verificar se o arquivo não está vazio
+        if file_size == 0:
+            print("[TELEGRAPH] Erro: Arquivo está vazio")
+            return None
+        
+        # Verificar se o arquivo não é muito grande (Telegraph tem limite de ~5MB)
+        if file_size > 5 * 1024 * 1024:
+            print(f"[TELEGRAPH] Erro: Arquivo muito grande ({file_size} bytes). Limite: 5MB")
+            return None
+        
+        # Primeiro tentar Telegraph
+        telegraph_result = try_telegraph_upload(image_path, mime_type)
+        if telegraph_result:
+            return telegraph_result
+            
+        # Se Telegraph falhar, tentar serviços alternativos como fallback
+        print("[UPLOAD] Telegraph falhou, tentando serviços alternativos como fallback...")
+        return try_imgbb_upload(image_path)
+        
+    except Exception as e:
+        print(f"[UPLOAD] Erro inesperado: {type(e).__name__}: {e}")
+        import traceback
+        print(f"[UPLOAD] Traceback: {traceback.format_exc()}")
+        return None
+
+def try_telegraph_upload(image_path, mime_type):
+    try:
+        with open(image_path, "rb") as f:
+            print("[TELEGRAPH] Enviando requisição POST para telegra.ph...")
+            
+            # Tentar múltiplas abordagens
+            attempts = [
+                # Tentativa 1: Formato mais simples
+                {'file': ('image.jpg', f, 'image/jpeg')},
+                # Tentativa 2: Sem MIME type
+                {'file': ('image.jpg', f)},
+                # Tentativa 3: Só o arquivo
+                {'file': f},
+            ]
+            
+            for attempt_num, files_data in enumerate(attempts, 1):
+                try:
+                    print(f"[TELEGRAPH] Tentativa {attempt_num}")
+                    
+                    f.seek(0)
+                    
+                    response = requests.post(
+                        'https://telegra.ph/upload',
+                        files=files_data,
+                        timeout=30,
+                        headers={
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                        }
+                    )
+                    
+                    print(f"[TELEGRAPH] Tentativa {attempt_num} - Status: {response.status_code}")
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        print(f"[TELEGRAPH] Dados recebidos: {data}")
+                        
+                        if isinstance(data, list) and len(data) > 0 and "src" in data[0]:
+                            link = "https://telegra.ph" + data[0]["src"]
+                            print(f"[TELEGRAPH] Sucesso na tentativa {attempt_num}! Link: {link}")
+                            return link
+                    else:
+                        print(f"[TELEGRAPH] Tentativa {attempt_num} falhou: {response.text}")
+                        
+                except Exception as e:
+                    print(f"[TELEGRAPH] Erro na tentativa {attempt_num}: {e}")
+                    
+        print("[TELEGRAPH] Todas as tentativas falharam")
+        return None
+        
+    except Exception as e:
+        print(f"[TELEGRAPH] Erro geral: {e}")
+        return None
+
+def try_imgbb_upload(image_path):
+    try:
+        print("[FALLBACK] Tentando upload para 0x0.st...")
+        
+        with open(image_path, "rb") as f:
+            response = requests.post(
+                'https://0x0.st',
+                files={'file': f},
+                timeout=30,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+            )
+            
+        print(f"[FALLBACK] Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            link = response.text.strip()
+            print(f"[FALLBACK] Sucesso! Link: {link}")
+            return link
+        else:
+            print(f"[FALLBACK] 0x0.st falhou: {response.text}")
+            
+            # Tentar outro serviço como segundo fallback
+            return try_catbox_upload(image_path)
+            
+    except Exception as e:
+        print(f"[FALLBACK] Erro no 0x0.st: {e}")
+        # Tentar outro serviço como segundo fallback
+        return try_catbox_upload(image_path)
+
+def try_catbox_upload(image_path):
+    try:
+        print("[FALLBACK2] Tentando upload para catbox.moe...")
+        
+        with open(image_path, "rb") as f:
+            response = requests.post(
+                'https://catbox.moe/user/api.php',
+                data={'reqtype': 'fileupload'},
+                files={'fileToUpload': f},
+                timeout=30,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+            )
+            
+        print(f"[FALLBACK2] Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            link = response.text.strip()
+            if link.startswith('https://'):
+                print(f"[FALLBACK2] Sucesso! Link: {link}")
+                return link
+            else:
+                print(f"[FALLBACK2] Resposta inválida: {link}")
+                return None
+        else:
+            print(f"[FALLBACK2] Catbox falhou: {response.text}")
+            return None
+            
+    except Exception as e:
+        print(f"[FALLBACK2] Erro no catbox: {e}")
+        return None
+
 
 # Classe para o menu de seleção de cidades
 class CidadeSelect(discord.ui.Select):
@@ -138,6 +299,93 @@ class Utils(commands.Cog):
         embedhelp.set_footer(text = "Documentação: https://github.com/dataexpert0/Viktor-Bot")
         
         await interaction.followup.send(embed = embedhelp)
+
+    # Serviço de hospedagem de imagens via Viktor Bot - Telegraph
+    @commands.command(name="hospedar")
+    async def hospedar(self, ctx):
+        await ctx.send(f"{ctx.author}, será feita a hospedagem da imagem através do serviço (Telegraph) - rota mais rápida. O link será enviado em seguida.")
+        await ctx.send(f"Caso todas as rotas não sejam possíveis, o catbox.moe será utilizado como prioridade.")
+
+        try:
+            print(f"[HOSPEDAR] Comando iniciado pelo usuário: {ctx.author} ({ctx.author.id})")
+            
+            if not ctx.message.attachments:
+                print("[HOSPEDAR] Erro: Nenhum anexo encontrado")
+                await ctx.send("Envie o comando junto de uma imagem como anexo.")
+                return
+            
+            imagem = ctx.message.attachments[0]
+            print(f"[HOSPEDAR] Anexo detectado: {imagem.filename} ({imagem.size} bytes)")
+            
+            if not imagem.content_type or not imagem.content_type.startswith("image/"):
+                print(f"[HOSPEDAR] Erro: Tipo de arquivo inválido: {imagem.content_type}")
+                await ctx.send("O arquivo enviado não é uma imagem válida.")
+                return
+
+            print(f"[HOSPEDAR] Tipo de imagem válido: {imagem.content_type}")
+
+            # Determinar extensão baseada no content_type se filename não tiver
+            if imagem.filename:
+                ext = os.path.splitext(imagem.filename)[1].lower()
+            else:
+                # Mapear content_type para extensão
+                ext_mapping = {
+                    'image/jpeg': '.jpg',
+                    'image/jpg': '.jpg', 
+                    'image/png': '.png',
+                    'image/gif': '.gif',
+                    'image/webp': '.webp'
+                }
+                ext = ext_mapping.get(imagem.content_type.lower(), '.jpg')
+            
+            # Se não houver extensão, usar .jpg como padrão
+            if not ext:
+                ext = '.jpg'
+                
+            print(f"[HOSPEDAR] Extensão determinada: {ext}")
+            mime = imagem.content_type
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                print(f"[HOSPEDAR] Salvando imagem temporariamente: {tmp.name}")
+                tmp_path = tmp.name
+            
+            # Salvar o arquivo fora do context manager
+            await imagem.save(tmp_path)
+            
+            # Verificar se o arquivo foi salvo corretamente
+            if not os.path.exists(tmp_path):
+                print(f"[HOSPEDAR] Erro: Arquivo não foi salvo corretamente: {tmp_path}")
+                await ctx.send("Erro ao salvar a imagem temporariamente.")
+                return
+                
+            saved_size = os.path.getsize(tmp_path)
+            print(f"[HOSPEDAR] Arquivo salvo com sucesso. Tamanho: {saved_size} bytes")
+            
+            try:
+                print("[HOSPEDAR] Enviando imagem para Telegraph...")
+                link = envio_telegraph(tmp_path, mime)
+                if link:
+                    print(f"[HOSPEDAR] Sucesso! Link gerado: {link}")
+                    await ctx.send(f"Imagem hospedada: {link}")
+                else:
+                    print("[HOSPEDAR] Erro: Telegraph retornou None")
+                    await ctx.send("Falha ao enviar a imagem para o serviço de hospedagem (Telegraph).")
+            except Exception as e:
+                print(f"[HOSPEDAR] Erro durante envio para Telegraph: {type(e).__name__}: {e}")
+                await ctx.send("Erro interno ao processar a imagem. Tente novamente.")
+            finally:
+                try:
+                    os.remove(tmp_path)
+                    print(f"[HOSPEDAR] Arquivo temporário removido: {tmp_path}")
+                except Exception as e:
+                    print(f"[HOSPEDAR] Aviso: Falha ao remover arquivo temporário: {e}")
+                    
+        except Exception as e:
+            print(f"[HOSPEDAR] Erro crítico no comando: {type(e).__name__}: {e}")
+            import traceback
+            print(f"[HOSPEDAR] Traceback completo:\n{traceback.format_exc()}")
+            await ctx.send("Ocorreu um erro inesperado. Verifique os logs do terminal.")
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Utils(bot))
