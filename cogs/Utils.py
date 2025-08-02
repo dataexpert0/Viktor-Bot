@@ -10,6 +10,11 @@ import requests_cache
 from bs4 import BeautifulSoup
 from retry_requests import retry
 from datetime import datetime, timezone
+from samp_client.client import SampClient
+
+with SampClient(address='80.75.221.41', port=7777) as client:
+    info = client.get_server_info()
+    print(info.players, '/', info.max_players)
 
 samp_server_url = "https://open.mp/servers/80.75.221.41:7777"
 
@@ -411,7 +416,7 @@ class Utils(commands.Cog):
 
             embed = discord.Embed(
                 title = hostname,
-                description = f"Jogadores: {players}\nÚltima atualização em formato UTC: {lastupdate_dt}",
+                description = f"Jogadores: {info.players}\nÚltima atualização em formato UTC: {lastupdate_dt}",
                 color = 0x00ff00
             )
             embed.set_footer(text="Dados retirados via | Open.mp")
