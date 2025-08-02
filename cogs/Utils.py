@@ -300,7 +300,7 @@ class Utils(commands.Cog):
         
         await interaction.followup.send(embed = embedhelp)
 
-    # Serviço de hospedagem de imagens via Viktor Bot - Telegraph
+    # Serviço de hospedagem de imagens via Viktor Bot - Telegraph | Catbox | 0x0.st
     @commands.command(name="hospedar")
     async def hospedar(self, ctx):
         await ctx.send(f"{ctx.author}, será feita a hospedagem da imagem através do serviço (Telegraph) - rota mais rápida. O link será enviado em seguida.")
