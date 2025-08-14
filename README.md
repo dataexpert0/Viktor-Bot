@@ -35,3 +35,5 @@ O bot já possui alguns comandos básicos, como o registro de *scrims* através 
 *!resultstats* - retorna um gráfico de pizza em ggplot2 contendo as vitórias e derrotas da equipe/taxas de vitória e derrota
 
 */registrar* - slash command em testes que abre um formulário para preenchimento de dados *composição vs. composição*, para adição de feature futura capaz de fazer análise de *winrate* por campeão escolhido, *rota mais escolhida*, entre outros, com o auxílio de charts com Seaborn/ggplot2 e APIs.
+
+*/patchnotes* - retorna um URL que direciona ao Patch Notes mais recente do League of Legends, com um pequeno sumário da atualização. Ainda contém uma issue no scraping por não ser possível puxar a imagem de source/src estático, então foi definida com a mais recente (patch 25.16).
