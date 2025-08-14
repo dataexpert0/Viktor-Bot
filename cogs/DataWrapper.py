@@ -11,6 +11,8 @@ import json
 import matplotlib.pyplot as plt
 from datetime import datetime
 import traceback
+import requests
+from bs4 import BeautifulSoup
 
 class ScrimModal(Modal, title = "Registrar Partida | Scrim"):
     def __init__(self):
@@ -168,6 +170,44 @@ class DataWrapper(commands.Cog):
             print(f"Debug: {e}")
             traceback.print_exc()
 
+            
+    @app_commands.command(name = "patchnotes", description = "Retorna um embed com as informações do patch notes atual")
+    async def patchnotes(self, interaction: discord.Interaction):
+        try:
+            response = requests.get("https://ddragon.leagueoflegends.com/api/versions.json")
+            response.raise_for_status()
+            versions = response.json()
+
+            versao_recente = versions[0]
+            patchver = f"2{versao_recente[1]}-{versao_recente.split('.')[1]}"
+
+            patch_url = f"https://www.leagueoflegends.com/pt-br/news/game-updates/patch-{patchver}-notes/"
+
+            response = requests.get(patch_url)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            title_tag = soup.find("h1")
+            summary_tag = soup.find("p")
+            patch_image = soup.find("img")
+            img_url = "https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/e81bbafe62c7ff6d6937295df9e573546ec4f0c0-1920x1080.jpg"
+
+            title = title_tag.get_text(strip=True) if title_tag else f"Patch {patchver}"
+            summary = summary_tag.get_text(strip=True) if summary_tag else "Resumo não disponível."
+            
+            embed = discord.Embed(
+                title = title,
+                url = patch_url,
+                description = summary,
+                color = discord.Color.blue()
+            )
+            embed.set_image(url = img_url)
+            embed.set_footer(text="Fonte: Riot Games • Data Dragon")
+
+            await interaction.response.send_message(embed=embed)
+
+        except Exception as e:
+            await interaction.response.send_message(f"Ocorreu um erro ao buscar o patch notes: {e}")
 
 async def setup(bot):
     await bot.add_cog(DataWrapper(bot))
