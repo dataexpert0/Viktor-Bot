@@ -1,0 +1,11 @@
+discord.py
+python-dotenv
+pandas
+seaborn
+matplotlib
+requests
+beautifulsoup4
+openmeteo-requests
+requests-cache
+retry-requests
+samp-client

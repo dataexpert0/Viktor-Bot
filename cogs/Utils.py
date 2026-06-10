@@ -12,12 +12,6 @@ from retry_requests import retry
 from datetime import datetime, timezone
 from samp_client.client import SampClient
 
-with SampClient(address='80.75.221.41', port=7777) as client:
-    info = client.get_server_info()
-    print(info.players, '/', info.max_players)
-
-samp_server_url = "https://open.mp/servers/80.75.221.41:7777"
-
 def envio_telegraph(image_path, mime_type='image/jpeg'):
     try:
         print(f"[TELEGRAPH] Iniciando upload do arquivo: {image_path}")

@@ -14,6 +14,16 @@ import traceback
 import requests
 from bs4 import BeautifulSoup
 
+load_dotenv()
+riot_api_key = os.getenv('riot_api_key')
+
+REGIONAL = "americas"
+PLATFORM = "br1"
+
+HEADERS = {
+    "X-Riot-Token": riot_api_key
+}
+
 class ScrimModal(Modal, title = "Registrar Partida | Scrim"):
     def __init__(self):
         super().__init__(title="Registrar Partida | Scrim")
@@ -59,6 +69,137 @@ class ScrimModal(Modal, title = "Registrar Partida | Scrim"):
 
 
 data = "scrims.json"
+
+def riot_get_puuid(game_name: str, tag_line: str) -> str:
+    url = (
+        f"https://{REGIONAL}.api.riotgames.com/riot/account/v1/"
+        f"accounts/by-riot-id/{game_name}/{tag_line}"
+    )
+
+    response = requests.get(url, headers=HEADERS, timeout=15)
+    response.raise_for_status()
+
+    return response.json()["puuid"]
+
+
+def riot_get_match_ids(puuid: str, count: int = 20, queue: int = 420) -> list[str]:
+    url = (
+        f"https://{REGIONAL}.api.riotgames.com/lol/match/v5/"
+        f"matches/by-puuid/{puuid}/ids"
+    )
+
+    params = {
+        "start": 0,
+        "count": count,
+        "queue": queue
+    }
+
+    response = requests.get(url, headers=HEADERS, params=params, timeout=15)
+    response.raise_for_status()
+
+    return response.json()
+
+
+def riot_get_match_detail(match_id: str) -> dict:
+    url = f"https://{REGIONAL}.api.riotgames.com/lol/match/v5/matches/{match_id}"
+
+    response = requests.get(url, headers=HEADERS, timeout=15)
+    response.raise_for_status()
+
+    return response.json()
+
+
+def extract_player_data_from_match(match: dict, puuid: str) -> dict | None:
+    participants = match["info"]["participants"]
+
+    player = next(
+        (participant for participant in participants if participant["puuid"] == puuid),
+        None
+    )
+
+    if player is None:
+        return None
+
+    return {
+        "champion": player["championName"],
+        "win": player["win"],
+        "kills": player["kills"],
+        "deaths": player["deaths"],
+        "assists": player["assists"],
+        "team_position": player.get("teamPosition", "UNKNOWN"),
+        "queue_id": match["info"]["queueId"]
+    }
+
+
+def build_champion_summary(game_name: str, tag_line: str, count: int = 20, queue: int = 420) -> pd.DataFrame:
+    puuid = riot_get_puuid(game_name, tag_line)
+    match_ids = riot_get_match_ids(puuid, count=count, queue=queue)
+
+    rows = []
+
+    for match_id in match_ids:
+        match = riot_get_match_detail(match_id)
+        row = extract_player_data_from_match(match, puuid)
+
+        if row is not None:
+            rows.append(row)
+
+    if not rows:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows)
+
+    summary = (
+        df.groupby("champion")
+        .agg(
+            games=("champion", "count"),
+            wins=("win", "sum"),
+            avg_kills=("kills", "mean"),
+            avg_deaths=("deaths", "mean"),
+            avg_assists=("assists", "mean")
+        )
+        .reset_index()
+    )
+
+    summary["losses"] = summary["games"] - summary["wins"]
+    summary["win_rate"] = summary["wins"] / summary["games"] * 100
+    summary["pick_frequency"] = summary["games"] / summary["games"].sum() * 100
+
+    summary = summary.sort_values(["games", "win_rate"], ascending=False)
+
+    return summary
+
+def create_champion_heatmap(summary: pd.DataFrame, game_name: str, tag_line: str) -> str:
+    heatmap_data = summary.set_index("champion")[
+        ["win_rate", "pick_frequency"]
+    ].round(1)
+
+    height = max(5, len(heatmap_data) * 0.55)
+
+    plt.figure(figsize=(9, height))
+
+    sns.heatmap(
+        heatmap_data,
+        annot=True,
+        fmt=".1f",
+        cmap="RdYlGn",
+        linewidths=0.5,
+        linecolor="white",
+        cbar=True
+    )
+
+    plt.title(f"Heatmap de Campeões - {game_name}#{tag_line}")
+    plt.xlabel("Métricas")
+    plt.ylabel("Campeão")
+    plt.tight_layout()
+
+    safe_name = f"{game_name}_{tag_line}".replace(" ", "_").replace("#", "_")
+    image_path = f"heatmap_{safe_name}.png"
+
+    plt.savefig(image_path, dpi=160, bbox_inches="tight")
+    plt.close()
+
+    return image_path
 
 def dataload():
     if not os.path.exists(data):
@@ -121,6 +262,66 @@ class DataWrapper(commands.Cog):
 
         await ctx.send(embed=embed, view=ScrimButtons(line, adversario, mapa))
 
+
+    @commands.command(name = "heatmap")
+    async def heatmap(self, ctx, game_name: str , tag_line: str, count: int = 10, queue: int = 420):
+
+        await ctx.send("Buscando partidas através da Riot API, por favor, aguarde.")
+
+        try:
+            if count < 1: 
+                await ctx.send("O número de partidas deve ser maior do que 0.")
+                return
+            
+            if count > 50:
+                await ctx.send("Use no máximo 50 partidas por requisição no momento.")
+                return
+            
+            summary = await asyncio.to_thread(build_champion_summary, game_name, tag_line, count, queue)
+
+            if summary.empty: 
+                await ctx.send("O jogador em questão não possui partidas recentes ou não foi encontrado.")
+                return
+            
+            image_path = await asyncio.to_thread(create_champion_heatmap, summary, game_name, tag_line)
+
+            embed = discord.Embed(
+                title = "📊 Heatmap de Campeões",
+                description=(
+                    f"Jogador: `{game_name}#{tag_line}`\n"
+                    f"Partidas analisadas: `{count}`\n"
+                    f"Queue: `{queue}/Ranked Solo/Duo`"
+                ),
+                color = discord.Color.green()
+            )
+
+            file = discord.File(image_path, filename="heatmap.png")
+            embed.set_image(url="attachment://heatmap.png")
+
+            await ctx.send(embed=embed, file=file)
+
+            if os.path.exists(image_path):
+                os.remove(image_path)
+
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response else "desconhecido"
+
+            if status_code == 401:
+                await ctx.send("Erro 401. No momento indisponível para uso.")
+            elif status_code == 403: 
+                await ctx.send("Erro 403. Endpoint inacessível no momento.")
+            elif status_code == 404: 
+                await ctx.send("Jogador não encontrado. Verifique o nome e tag.")
+            elif status_code == 429: 
+                await ctx.send("Limite de requisições atingido. Tente novamente mais tarde.")
+            else:
+                await ctx.send(f"Tente novamente mais tarde.")
+
+        except Exception as e: 
+            traceback.print_exc()
+            await ctx.send(f"Ocorreu um erro inesperado: {e}")
+
+
     @commands.command(name="listar_scrims")
     async def listarscrims(self, ctx):
         dados = dataload()
@@ -181,7 +382,7 @@ class DataWrapper(commands.Cog):
             versao_recente = versions[0]
             patchver = f"2{versao_recente[1]}-{versao_recente.split('.')[1]}"
 
-            patch_url = f"https://www.leagueoflegends.com/pt-br/news/game-updates/patch-{patchver}-notes/"
+            patch_url = f"https://www.leagueoflegends.com/pt-br/news/game-updates/league-of-legends-patch-{patchver}-notes/"
 
             response = requests.get(patch_url)
             response.raise_for_status()
@@ -190,7 +391,7 @@ class DataWrapper(commands.Cog):
             title_tag = soup.find("h1")
             summary_tag = soup.find("p")
             patch_image = soup.find("img")
-            img_url = "https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/e81bbafe62c7ff6d6937295df9e573546ec4f0c0-1920x1080.jpg"
+            img_url = "https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/078e912a89ff27a60699425065aecbc478435969-1920x1080.png"
 
             title = title_tag.get_text(strip=True) if title_tag else f"Patch {patchver}"
             summary = summary_tag.get_text(strip=True) if summary_tag else "Resumo não disponível."
