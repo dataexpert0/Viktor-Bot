@@ -22,7 +22,7 @@ Nessa aba, ficará algumas propostas de implementação.
 
 ## Código
 
-O *Viktor Bot* é primariamente escrito em Python 3.x, mas existe a possibilidade de ter outras propostas em Java, C++, entre outros.
+O *Viktor Bot* é escrito em Python 3.x.
 
 ## Utilização
 
