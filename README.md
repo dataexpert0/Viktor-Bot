@@ -37,3 +37,5 @@ O bot já possui alguns comandos básicos, como o registro de *scrims* através 
 */registrar* - slash command em testes que abre um formulário para preenchimento de dados *composição vs. composição*, para adição de feature futura capaz de fazer análise de *winrate* por campeão escolhido, *rota mais escolhida*, entre outros, com o auxílio de charts com Seaborn/ggplot2 e APIs.
 
 */patchnotes* - retorna um URL que direciona ao Patch Notes mais recente do League of Legends, com um pequeno sumário da atualização. Ainda contém uma issue no scraping por não ser possível puxar a imagem de source/src estático, então foi definida com a mais recente (patch 25.16).
+
+*!heatmap "Nick do Jogador" (tag) (número de partidas)* - retorna um mapa de calor que relaciona a taxa de vitória com a frequência de escolha dos determinados campeões que um jogador jogou durante a temporada na Ranked Solo/Duo. 
